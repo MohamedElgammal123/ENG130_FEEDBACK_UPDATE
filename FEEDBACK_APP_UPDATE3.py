@@ -32,13 +32,23 @@ def find_matching_question_key(qnum, feedback_data):
             return key
     return None
 
-def generate_feedback_text(df, feedback_data):
+def generate_feedback_text(df, feedback_data, course_title, extra_field):
     reports = {}
     for _, row in df.iterrows():
         name = f"{row['First Name']} {row['Last Name']}"
         sid  = row['Student No']
-        scored = str(row['Scored Responses']).replace('R=', '').strip()
-        lines = [f"Feedback for {name} (ID: {sid})\n"]
+        scored = str(row['Scored Responses']).replace('R=', '').strip().split()
+        
+        # Build header for each feedback file
+        lines = [
+            f"Course: {course_title}",
+            f"Additional Info: {extra_field}",
+            "",
+            f"Feedback for {name} (ID: {sid})",
+            "-" * 40,
+            ""
+        ]
+        
         for i, ans in enumerate(scored, start=1):
             if ans in ['.', '-']:
                 lines.append(f"Question {i}: Not attempted.\n")
@@ -54,6 +64,7 @@ def generate_feedback_text(df, feedback_data):
                 lines.append(f"  - Feedback: {just}\n")
             else:
                 lines.append(f"Question {i}: No feedback provided.\n")
+        
         reports[sid] = "\n".join(lines)
     return reports
 
@@ -66,27 +77,27 @@ def create_zip_from_feedback(reports):
     return buf
 
 # ─── HEADER WITH TWO LOGOS ────────────────────────────────────────────────────
-ua_logo   = Image.open("ua_logo_green_rgb.png")
-engg_logo = Image.open("copy-of-faculty-of-engineering.jpg")
+ua_logo       = Image.open("ua_logo_green_rgb.png")
+engg_logo     = Image.open("copy-of-faculty-of-engineering.jpg")
+feedback_icon = Image.open("feedback-line-icon-free-vector.jpg")
 
+# Top row: UAlberta logo on left, Faculty of Engineering logo on right
 col1, col2 = st.columns(2)
 with col1:
-    st.image(ua_logo, width=250)       # UA logo on the left
+    st.image(ua_logo, width=250)
 with col2:
-    st.image(engg_logo, width=250)     # Engineering logo on the right
+    st.image(engg_logo, width=250)
 
-# ─── TITLE & FEEDBACK ICON ───────────────────────────────────────────────────
-st.title("Student Feedback Generator")
-
-feedback_icon = Image.open("feedback-line-icon-free-vector.jpg")
-st.image(feedback_icon, width=120)    # moved immediately after title
+# ─── TITLE WITH FEEDBACK ICON ────────────────────────────────────────────────
+title_col, icon_col = st.columns([5, 1])
+with title_col:
+    st.title("Student Feedback Generator")
+with icon_col:
+    st.image(feedback_icon, width=60)
 
 # ─── INPUTS ──────────────────────────────────────────────────────────────────
 course_title = st.text_input("Course Title", placeholder="e.g. ENG 130")
 extra_field  = st.text_input("Additional Info", placeholder="e.g. Semester or Instructor")
-
-if course_title or extra_field:
-    st.write(f"**Course:** {course_title}   |   **Info:** {extra_field}")
 
 st.markdown("---")
 
@@ -101,7 +112,7 @@ if excel_file and json_file:
         try:
             df      = load_student_answers(excel_file)
             fdata   = load_feedback(json_file)
-            reports = generate_feedback_text(df, fdata)
+            reports = generate_feedback_text(df, fdata, course_title, extra_field)
             zipbuf  = create_zip_from_feedback(reports)
 
             st.success("Feedback reports generated successfully!")
