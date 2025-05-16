@@ -1,12 +1,14 @@
 # app.py
 # -*- coding: utf-8 -*-
 """
-Student Feedback Generator
+Created on Mon Mar 31 08:49:42 2025
+@author: mmelgamm
 """
 
 import streamlit as st
 import pandas as pd
 import json, io, zipfile, os
+import re
 from PIL import Image
 
 # ─── Functions for processing files and generating feedback ─────────────────
@@ -37,9 +39,10 @@ def generate_feedback_text(df, feedback_data, course_title, extra_field):
     for _, row in df.iterrows():
         name = f"{row['First Name']} {row['Last Name']}"
         sid  = row['Student No']
-        scored = str(row['Scored Responses']).replace('R=', '').strip().split()
-        
-        # Build header for each feedback file
+        raw  = str(row['Scored Responses']).replace('R=', '').strip()
+        answers = re.findall(r"[A-Za-z\.\-]", raw)
+
+        # build header for each feedback file
         lines = [
             f"Course: {course_title}",
             f"Additional Info: {extra_field}",
@@ -48,8 +51,8 @@ def generate_feedback_text(df, feedback_data, course_title, extra_field):
             "-" * 40,
             ""
         ]
-        
-        for i, ans in enumerate(scored, start=1):
+
+        for i, ans in enumerate(answers, start=1):
             if ans in ['.', '-']:
                 lines.append(f"Question {i}: Not attempted.\n")
                 continue
@@ -64,7 +67,7 @@ def generate_feedback_text(df, feedback_data, course_title, extra_field):
                 lines.append(f"  - Feedback: {just}\n")
             else:
                 lines.append(f"Question {i}: No feedback provided.\n")
-        
+
         reports[sid] = "\n".join(lines)
     return reports
 
@@ -77,33 +80,30 @@ def create_zip_from_feedback(reports):
     return buf
 
 # ─── HEADER WITH TWO LOGOS ────────────────────────────────────────────────────
-ua_logo       = Image.open("ua_logo_green_rgb.png")
-engg_logo     = Image.open("copy-of-faculty-of-engineering.jpg")
-feedback_icon = Image.open("feedback-line-icon-free-vector.jpg")
+ua_logo   = Image.open("ua_logo_green_rgb.png")
+engg_logo = Image.open("copy-of-faculty-of-engineering.jpg")
 
-# Top row: UAlberta logo on left, Faculty of Engineering logo on right
 col1, col2 = st.columns(2)
 with col1:
     st.image(ua_logo, width=250)
 with col2:
     st.image(engg_logo, width=250)
 
-# ─── TITLE WITH FEEDBACK ICON ────────────────────────────────────────────────
+# ─── TITLE & FEEDBACK ICON ───────────────────────────────────────────────────
 title_col, icon_col = st.columns([5, 1])
 with title_col:
     st.title("Student Feedback Generator")
 with icon_col:
+    feedback_icon = Image.open("feedback-line-icon-free-vector.jpg")
     st.image(feedback_icon, width=60)
 
 # ─── INPUTS ──────────────────────────────────────────────────────────────────
 course_title = st.text_input("Course Title", placeholder="e.g. ENG 130")
 extra_field  = st.text_input("Additional Info", placeholder="e.g. Semester or Instructor")
-
 st.markdown("---")
 
 # ─── FILE UPLOADERS & MAIN LOGIC ─────────────────────────────────────────────
 st.write("Upload the Excel file containing student answers and the JSON file with feedback data.")
-
 excel_file = st.file_uploader("Upload Student Answers (Excel)", type=["xlsx"])
 json_file  = st.file_uploader("Upload Feedback Data (JSON)",  type=["json"])
 
